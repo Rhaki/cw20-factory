@@ -1,8 +1,7 @@
 use cosmwasm_std::{entry_point, Binary, Deps, DepsMut, Empty, Env, MessageInfo, StdResult};
-use cw20_base::msg::InstantiateMsg;
 use cw20_factory_base::contract::Cw20FactoryBase;
 use cw20_factory_pkg::cw20_factory::{
-    msgs::{ExecuteMsg, MigrateMsg, QueryMsg},
+    msgs::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     ContractResponse,
 };
 use interface::OsmosisTokenFactoryInterface;

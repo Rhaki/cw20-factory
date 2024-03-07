@@ -1,4 +1,4 @@
-use cosmwasm_std::{CosmosMsg, Empty, Response, SubMsg};
+use cosmwasm_std::{CosmosMsg, Empty, Response};
 
 pub trait IntoCustom<T> {
     type Output;
@@ -10,20 +10,6 @@ impl<T> IntoCustom<T> for Vec<CosmosMsg<Empty>> {
     type Output = Vec<CosmosMsg<T>>;
     fn to_custom(self) -> Vec<CosmosMsg<T>> {
         self.into_iter().map(|msg| msg.to_custom()).collect()
-    }
-}
-
-impl<T> IntoCustom<T> for Vec<SubMsg<Empty>> {
-    type Output = Vec<SubMsg<T>>;
-    fn to_custom(self) -> Vec<SubMsg<T>> {
-        self.into_iter()
-            .map(|msg| SubMsg {
-                id: msg.id,
-                msg: msg.msg.to_custom(),
-                gas_limit: msg.gas_limit,
-                reply_on: msg.reply_on,
-            })
-            .collect()
     }
 }
 

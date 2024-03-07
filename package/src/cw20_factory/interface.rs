@@ -1,7 +1,8 @@
 use cosmwasm_std::{Attribute, Coin, CosmosMsg, CustomQuery, DepsMut, Empty, Env, MessageInfo};
-use cw20_base::msg::InstantiateMsg;
 
 use crate::cw20_factory::ContractResult;
+
+use super::msgs::InstantiateMsg;
 
 pub struct InterfaceInstantiateResponse<CM> {
     pub attributes: Vec<Attribute>,

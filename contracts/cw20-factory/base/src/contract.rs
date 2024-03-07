@@ -1,23 +1,26 @@
 use std::marker::PhantomData;
 
 use cosmwasm_std::{
-    attr, Addr, Binary, Coin, CustomQuery, Deps, DepsMut, Empty, Env, MessageInfo, Response,
-    StdResult, Storage, Uint128,
+    attr, Addr, Binary, Coin, CosmosMsg, CustomQuery, Deps, DepsMut, Empty, Env, MessageInfo,
+    Response, StdResult, Storage, Uint128, WasmMsg,
 };
 use cw20::Cw20ExecuteMsg;
-use cw20_base::{
-    msg::{InstantiateMsg, QueryMsg as Cw20QueryMsg},
-    state::BALANCES,
-};
+use cw20_base::{msg::QueryMsg as Cw20QueryMsg, state::BALANCES};
 
-use cw20_factory_pkg::cw20_factory::{
-    definitions::TransmuteInto,
-    interface::TokenFactoryInterface,
-    msgs::{ExecuteMsg, MigrateMsg, QueryMsg},
-    traits::IntoCustom,
-    ContractResponse, ContractResult, Cw20FactoryError,
+use cw20_factory_pkg::{
+    cw20_factory::{
+        definitions::TransmuteInto,
+        interface::TokenFactoryInterface,
+        msgs::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
+        traits::IntoCustom,
+        ContractResponse, ContractResult, Cw20FactoryError,
+    },
+    cw20_indexer::msgs::RegisterDenomMsg,
 };
-use rhaki_cw_plus::traits::{FromBinary, IntoBinary, IntoBinaryResult, Wrapper};
+use rhaki_cw_plus::{
+    traits::{FromBinary, IntoAddr, IntoBinary, IntoBinaryResult, Wrapper},
+    wasm::WasmMsgBuilder,
+};
 
 use crate::state::FACTORY_DENOM;
 
@@ -44,10 +47,24 @@ where
             deps.branch().into_empty(),
             env.clone(),
             info.clone(),
-            msg.clone(),
+            msg.clone().into(),
         )?;
 
-        let interface_response = I::instantiate(deps.branch(), &env, info, msg)?;
+        let interface_response = I::instantiate(deps.branch(), &env, info, msg.clone())?;
+
+        let indexer_msg = if let Some(indexer) = msg.indexer {
+            let msg: CosmosMsg = WasmMsg::build_execute(
+                indexer.into_addr(deps.api)?,
+                cw20_factory_pkg::cw20_indexer::msgs::ExecuteMsg::RegisterDenom(RegisterDenomMsg {
+                    denom: interface_response.factory_denom.clone(),
+                }),
+                vec![],
+            )?
+            .into();
+            vec![msg.to_custom()]
+        } else {
+            vec![]
+        };
 
         FACTORY_DENOM.save(deps.storage, &interface_response.factory_denom)?;
 
@@ -57,6 +74,7 @@ where
             .add_attribute("factory_denom", interface_response.factory_denom)
             .add_submessages(base_response.messages.to_custom())
             .add_messages(interface_response.messages)
+            .add_messages(indexer_msg)
             .wrap_ok()
     }
 
@@ -67,7 +85,7 @@ where
         msg: ExecuteMsg,
     ) -> ContractResponse<CM> {
         match msg {
-            ExecuteMsg::TransmuteInto(_) => todo!(),
+            ExecuteMsg::TransmuteInto(into) => Self::run_transmute(deps, env, info, into),
             _ => {
                 let base: Cw20ExecuteMsg = msg.into_binary()?.des_into()?;
 
@@ -83,7 +101,7 @@ where
             QueryMsg::FactoryDenom {} => FACTORY_DENOM.load(deps.storage).into_binary(),
             _ => {
                 let base: Cw20QueryMsg = msg.into_binary()?.des_into()?;
-                cw20_base::contract::query(deps.into_empty(), env.clone(), base).into_binary()
+                cw20_base::contract::query(deps.into_empty(), env.clone(), base)
             }
         }
     }
@@ -110,7 +128,7 @@ where
         into: TransmuteInto,
     ) -> ContractResponse<CM> {
         let (msgs, attrs) = match into {
-            TransmuteInto::Cw20 { amount } => {
+            TransmuteInto::Native { amount } => {
                 reduce_cw20_balance(deps.storage, &info.sender, amount)?;
                 let amount = Coin::new(amount.u128(), FACTORY_DENOM.load(deps.storage)?);
                 let msgs_mint = I::mint(deps, &env, info, &amount)?;
@@ -122,7 +140,7 @@ where
                     ],
                 )
             }
-            TransmuteInto::Native {} => {
+            TransmuteInto::Cw20 {} => {
                 let received_coin = rhaki_cw_plus::asset::only_one_coin(&info.funds, None)?;
                 assert_denom(deps.storage, &received_coin)?;
                 increase_cw20_balance(deps.storage, &info.sender, received_coin.amount)?;
@@ -163,7 +181,13 @@ fn reduce_cw20_balance(
     amount: Uint128,
 ) -> ContractResult<Uint128> {
     BALANCES.update(storage, user, |balance| {
-        Ok(balance.unwrap_or_default() - amount)
+        Ok(balance
+            .unwrap_or_default()
+            .checked_sub(amount)
+            .map_err(|_| Cw20FactoryError::InsufficientCw20Balance {
+                current: balance.unwrap_or_default(),
+                requested: amount,
+            })?)
     })
 }
 

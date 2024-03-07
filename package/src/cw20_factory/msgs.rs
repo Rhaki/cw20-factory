@@ -1,8 +1,33 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Binary, Uint128};
-use cw20::{Expiration, Logo};
+use cw20::{Cw20Coin, Expiration, Logo, MinterResponse};
+use cw20_base::msg::InstantiateMarketingInfo;
 
 use super::definitions::TransmuteInto;
+
+#[cw_serde]
+pub struct InstantiateMsg {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+    pub initial_balances: Vec<Cw20Coin>,
+    pub mint: Option<MinterResponse>,
+    pub marketing: Option<InstantiateMarketingInfo>,
+    pub indexer: Option<String>,
+}
+
+impl Into<cw20_base::msg::InstantiateMsg> for InstantiateMsg {
+    fn into(self) -> cw20_base::msg::InstantiateMsg {
+        cw20_base::msg::InstantiateMsg {
+            name: self.name,
+            symbol: self.symbol,
+            decimals: self.decimals,
+            initial_balances: self.initial_balances,
+            mint: self.mint,
+            marketing: self.marketing,
+        }
+    }
+}
 
 #[cw_serde]
 pub enum ExecuteMsg {

@@ -1,8 +1,6 @@
 use cosmwasm_std::{Addr, Coin, CosmosMsg, DepsMut, Empty, Env, MessageInfo};
-use cw20_base::msg::InstantiateMsg;
 use cw20_factory_pkg::cw20_factory::{
-    interface::{InterfaceInstantiateResponse, TokenFactoryInterface},
-    ContractResult,
+    interface::{InterfaceInstantiateResponse, TokenFactoryInterface}, msgs::InstantiateMsg, ContractResult
 };
 use osmosis_std::types::{
     cosmos::base::v1beta1::Coin as CosmosCoin,
