@@ -1,0 +1,10 @@
+[package]
+name                 = "cw20-factory-pkg"
+
+version              = { workspace = true }
+authors              = { workspace = true }
+edition              = { workspace = true }
+
+[dependencies]
+cosmwasm-std         = { workspace = true }
+cosmwasm-schema      = { workspace = true }

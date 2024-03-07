@@ -1,0 +1,13 @@
+[package]
+name                 = "cw20-factory-base"
+version              = { workspace = true }
+authors              = { workspace = true }
+edition              = { workspace = true }
+exclude              = ["contract.wasm", "hash.txt"]
+
+[features]
+backtraces           = ["cosmwasm-std/backtraces"]
+default              = ["backtraces"]
+
+[dependencies]
+cosmwasm-std         = { workspace = true }
