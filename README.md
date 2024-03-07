@@ -1,9 +1,7 @@
 # CW20 FACTORY
 
-`cw20-factory` is an implementation of the `cw20-base` that manages a token both as `cw20` and as `native` through the use of the `TokenFactory`.
+The `cw20-factory` derived from the standard `CW20` implementation, designed to streamline the management of tokens both in the `CW20` and native formats through the use of a `Token Factory`. During the initial phase of contract initialization, the `native` version of the `token` is also produced via the `Token Factory`. This implementation retains the original` entry point`s of the `cw20-base`, yet it is enhanced with the `ExecuteMsg::TransmuteInto` functionality. This feature allows users to convert `native` tokens into `CW20` formats and vice versa.
 
-During the contract's initialization, the `native` version is also generated through the `TokenFactory`. The entry points are the same as those of the `cw20-base`, with the addition of the `ExecuteMsg::TransmuteInto` implementation that allows a user to transform `native tokens` into `cw20` and vice versa.
+In parallel, an auxiliary contract named `Indexer` is introduced, tasked with mapping between the `denom` associated with the `Token Factory` and the `CW20` address. This association process occurs automatically during the `cw20-factory` initialization.
 
-There is a second `contract`, called `Indexer`, that tracks the link between the token factory's `denom` and the `cw20` address. Registration occurs automatically during the `cw20-factory` initialization.
-
-For managing different types of `TokenFactory` across various chains, the contract requires, during compilation, a structure that implements the `TokenFactoryInterface` trait. This trait acts as an `interface` for communication with the `TokenFactory` module of a specific chain, keeping the base code free from these differences.
+To ensure proper management of the various types of `Token Factories` across different blockchains, the contract requires, at the compilation level, the use of a structure that implements the `TokenFactoryInterface` trait. This trait serves as a communicative bridge with the specific `TokenFactory` module of each blockchain, maintaining the base code's independence from interchain variations.
