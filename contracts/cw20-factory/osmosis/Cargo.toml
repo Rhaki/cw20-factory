@@ -8,6 +8,9 @@ exclude              = ["contract.wasm", "hash.txt"]
 [lib]
 crate-type           = ["cdylib", "rlib"]
 
+[features]
+library              = []
+
 [profile.release]
 opt-level            = 3
 debug                = false
@@ -19,9 +22,12 @@ panic                = 'abort'
 incremental          = false
 overflow-checks      = true
 
-[features]
-backtraces           = ["cosmwasm-std/backtraces"]
-
 [dependencies]
 cosmwasm-std         = { workspace = true }
+cw20                 = { workspace = true }
+cw20-base            = { workspace = true }
 cw20-factory-base    = { workspace = true }
+cw20-factory-pkg     = { workspace = true }
+rhaki-cw-plus        = { workspace = true }
+
+osmosis-std          = "0.22.0"

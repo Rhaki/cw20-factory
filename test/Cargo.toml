@@ -1,0 +1,9 @@
+[package]
+name                 = "cw20-factory-test"
+version              = { workspace = true }
+edition              = { workspace = true }
+
+[dependencies]
+rhaki-cw-plus        = { workspace = true, features = ["multi-test", "osmosis"]}
+cw20-factory-osmosis = { workspace = true }
+cw20-factory-pkg     = { workspace = true }

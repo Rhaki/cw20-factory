@@ -6,5 +6,8 @@ authors              = { workspace = true }
 edition              = { workspace = true }
 
 [dependencies]
-cosmwasm-std         = { workspace = true }
+cosmwasm-std         = { workspace = true, features = ["staking", "stargate"] }
 cosmwasm-schema      = { workspace = true }
+cw20                 = { workspace = true }
+cw20-base            = { workspace = true }
+thiserror            = { workspace = true }
