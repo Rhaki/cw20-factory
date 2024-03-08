@@ -7,6 +7,7 @@ use rhaki_cw_plus::{
     cw_asset::AssetInfo,
     math::IntoDecimal,
     multi_test::{
+        custom_app::ModuleDb,
         custom_modules::token_factory::CTokenFactoryFee,
         helper::{AppExt, Bench32AppExt, UnwrapError},
     },
@@ -21,7 +22,7 @@ use crate::helper::{
 #[test]
 #[rustfmt::skip]
 fn t1() {
-    let (mut app, db, def) = startup_osmosis();
+    let (mut app, mut db, def) = startup_osmosis();
 
     let msg_init = FactoryInstantiateMsg {
         name: "Token Foo".to_string(),
@@ -69,7 +70,9 @@ fn t1() {
 
     let fee_token_creation = AssetPrecisioned::new_super(AssetInfo::native("uosmo"), 6, 100_u128.into_decimal());
 
-    db.borrow_mut().token_factory.fee_creation = CTokenFactoryFee { fee: vec![fee_token_creation.clone().try_into().unwrap()], fee_collector: tf_fee_collector }.wrap_some();
+    db.as_db(app.storage_mut(), |db,_| {
+        db.token_factory.fee_creation = CTokenFactoryFee { fee: vec![fee_token_creation.clone().try_into().unwrap()], fee_collector: tf_fee_collector }.wrap_some();
+    }).unwrap();
 
     let msg_init = FactoryInstantiateMsg {
         name: "Token Bar".to_string(),
@@ -84,7 +87,6 @@ fn t1() {
    create_cw20_factory(&mut app, &def, msg_init.clone(), vec![]).unwrap_err_contains("Error on gather fee for denom creation");
 
    app.mint(&def.owner, fee_token_creation.clone());
-   db.borrow_mut().token_factory.supplies.remove("factory/osmo1nc5tatafv6eyq7llkr2gv50ff9e22mnf70qgjlv737ktmt4eswrqvlx82r/bar");
 
    create_cw20_factory(&mut app, &def, msg_init, vec![fee_token_creation.try_into().unwrap()]).unwrap();
 
@@ -93,7 +95,7 @@ fn t1() {
 #[test]
 #[rustfmt::skip]
 fn t2_migration() {
-    let (mut app, db, def) = startup_osmosis();
+    let (mut app, mut db, def) = startup_osmosis();
 
     let msg_init = Cw20BaseInstantiateMsg {
         name: "Token Foo".to_string(),
@@ -139,13 +141,14 @@ fn t2_migration() {
     let fee_token_creation = AssetPrecisioned::new_super(AssetInfo::native("uosmo"), 6, 100_u128.into_decimal());
     let tf_fee_collector = app.generate_addr("tf_fee_collector");
 
-    db.borrow_mut().token_factory.fee_creation = CTokenFactoryFee { fee: vec![fee_token_creation.clone().try_into().unwrap()], fee_collector: tf_fee_collector }.wrap_some();
+    db.as_db(app.storage_mut(), |db, _| {
+       db.token_factory.fee_creation = CTokenFactoryFee { fee: vec![fee_token_creation.clone().try_into().unwrap()], fee_collector: tf_fee_collector }.wrap_some()
+    }).unwrap();
 
     create_native(&mut app, &user_1, &foo_addr, vec![]).unwrap_err_contains("Error on gather fee for denom creation");
 
     app.mint(&user_1, fee_token_creation.clone());
 
-    db.borrow_mut().token_factory.supplies.remove("factory/osmo14hj2tavq8fpesdwxxcu44rty3hh90vhujrvcmstl4zr3txmfvw9sq2r9g9/foo");
 
     create_native(&mut app, &user_1, &foo_addr, vec![fee_token_creation.try_into().unwrap()]).unwrap();
 

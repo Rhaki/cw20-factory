@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use cosmwasm_std::{testing::MockStorage, Addr, Coin, CosmosMsg, WasmMsg};
 use cw20_base::msg::{InstantiateMsg as Cw20BaseInstantiateMsg, MigrateMsg};
 use cw20_factory_pkg::{
@@ -52,7 +50,7 @@ pub type OsmosisApp = App<
     OsmosisStargateModule,
 >;
 
-pub fn startup_osmosis() -> (OsmosisApp, Rc<RefCell<CModuleWrapper>>, Def) {
+pub fn startup_osmosis() -> (OsmosisApp, CModuleWrapper, Def) {
     let (mut app, db) = build_osmosis_app();
 
     let code_id_cw20_base = app.store_code(Box::new(
