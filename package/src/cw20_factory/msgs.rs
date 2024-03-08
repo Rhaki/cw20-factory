@@ -16,15 +16,15 @@ pub struct InstantiateMsg {
     pub indexer: Option<String>,
 }
 
-impl Into<cw20_base::msg::InstantiateMsg> for InstantiateMsg {
-    fn into(self) -> cw20_base::msg::InstantiateMsg {
+impl From<InstantiateMsg> for cw20_base::msg::InstantiateMsg {
+    fn from(val: InstantiateMsg) -> Self {
         cw20_base::msg::InstantiateMsg {
-            name: self.name,
-            symbol: self.symbol,
-            decimals: self.decimals,
-            initial_balances: self.initial_balances,
-            mint: self.mint,
-            marketing: self.marketing,
+            name: val.name,
+            symbol: val.symbol,
+            decimals: val.decimals,
+            initial_balances: val.initial_balances,
+            mint: val.mint,
+            marketing: val.marketing,
         }
     }
 }
@@ -33,12 +33,13 @@ impl Into<cw20_base::msg::InstantiateMsg> for InstantiateMsg {
 pub enum ExecuteMsg {
     /// Transmute `cw20` into `native` token or vice versa
     TransmuteInto(TransmuteInto),
-
+    /// Register this contract into an indexer
+    RegisterToIndexer { indexer_addr: String },
     // --- Base CW20 variants ---
     /// Transfer is a base message to move tokens to another account without triggering actions
     Transfer { recipient: String, amount: Uint128 },
     /// Burn is a base message to destroy tokens forever
-    Burn { amount: Uint128 },
+    Burn { amount: Option<Uint128> },
     /// Send is a base message to transfer tokens to a contract and trigger an action
     /// on the receiving contract.
     Send {
@@ -81,7 +82,11 @@ pub enum ExecuteMsg {
     BurnFrom { owner: String, amount: Uint128 },
     /// Only with the "mintable" extension. If authorized, creates amount new tokens
     /// and adds to the recipient balance.
-    Mint { recipient: String, amount: Uint128 },
+    Mint {
+        recipient: String,
+        amount: Uint128,
+        as_native: Option<bool>,
+    },
     /// Only with the "mintable" extension. The current minter may set
     /// a new minter. Setting the minter to None will remove the
     /// token's minter forever.

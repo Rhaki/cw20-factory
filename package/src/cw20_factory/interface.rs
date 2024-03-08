@@ -1,4 +1,6 @@
-use cosmwasm_std::{Attribute, Coin, CosmosMsg, CustomQuery, DepsMut, Empty, Env, MessageInfo};
+use cosmwasm_std::{
+    Addr, Attribute, Coin, CosmosMsg, CustomQuery, DepsMut, Empty, Env, MessageInfo,
+};
 
 use crate::cw20_factory::ContractResult;
 
@@ -21,14 +23,15 @@ pub trait TokenFactoryInterface<CQ: CustomQuery = Empty, CM = Empty> {
     fn burn(
         deps: DepsMut<CQ>,
         env: &Env,
-        info: MessageInfo,
+        info: &MessageInfo,
         amount: &Coin,
     ) -> ContractResult<Vec<CosmosMsg<CM>>>;
 
     fn mint(
         deps: DepsMut<CQ>,
         env: &Env,
-        info: MessageInfo,
+        info: &MessageInfo,
+        to: &Addr,
         amount: &Coin,
     ) -> ContractResult<Vec<CosmosMsg<CM>>>;
 }

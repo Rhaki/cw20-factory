@@ -1,6 +1,8 @@
 use cosmwasm_std::{Addr, Coin, CosmosMsg, DepsMut, Empty, Env, MessageInfo};
 use cw20_factory_pkg::cw20_factory::{
-    interface::{InterfaceInstantiateResponse, TokenFactoryInterface}, msgs::InstantiateMsg, ContractResult
+    interface::{InterfaceInstantiateResponse, TokenFactoryInterface},
+    msgs::InstantiateMsg,
+    ContractResult,
 };
 use osmosis_std::types::{
     cosmos::base::v1beta1::Coin as CosmosCoin,
@@ -39,7 +41,7 @@ impl TokenFactoryInterface for OsmosisTokenFactoryInterface {
     fn burn(
         _deps: DepsMut<Empty>,
         env: &Env,
-        _info: MessageInfo,
+        _info: &MessageInfo,
         amount: &Coin,
     ) -> ContractResult<Vec<CosmosMsg<Empty>>> {
         let msg = MsgBurn {
@@ -59,13 +61,14 @@ impl TokenFactoryInterface for OsmosisTokenFactoryInterface {
     fn mint(
         _deps: DepsMut<Empty>,
         env: &Env,
-        info: MessageInfo,
+        _info: &MessageInfo,
+        to: &Addr,
         amount: &Coin,
     ) -> ContractResult<Vec<CosmosMsg<Empty>>> {
         let msg = MsgMint {
             sender: env.contract.address.to_string(),
             amount: amount.clone().to_cosmos_coin().wrap_some(),
-            mint_to_address: info.sender.to_string(),
+            mint_to_address: to.to_string(),
         }
         .to_any();
 

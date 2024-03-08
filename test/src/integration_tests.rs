@@ -1,7 +1,14 @@
 use cw20::MinterResponse;
 use cw20_factory_pkg::cw20_factory::msgs::InstantiateMsg;
 use rhaki_cw_plus::{
-    asset::{AssetInfoPrecisioned, AssetPrecisioned}, cw_asset::AssetInfo, math::IntoDecimal, multi_test::{custom_modules::token_factory::CTokenFactoryFee, helper::{AppExt, Bench32AppExt, UnwrapError}}, traits::Wrapper
+    asset::{AssetInfoPrecisioned, AssetPrecisioned},
+    cw_asset::AssetInfo,
+    math::IntoDecimal,
+    multi_test::{
+        custom_modules::token_factory::CTokenFactoryFee,
+        helper::{AppExt, Bench32AppExt, UnwrapError},
+    },
+    traits::Wrapper,
 };
 
 use crate::helper::{create_token, qy_factory_denom, startup_osmosis, transmute};

@@ -1,4 +1,4 @@
-use cosmwasm_std::{Response, StdError, Uint128};
+use cosmwasm_std::{Int256, Response, StdError};
 use cw20_base::ContractError as Cw20BaseError;
 use thiserror::Error;
 
@@ -17,8 +17,8 @@ pub enum Cw20FactoryError {
     InvalidDenom { expected: String, received: String },
 
     #[error("Insufficient cw20 balance: current: {current}, requested: {requested}")]
-    InsufficientCw20Balance {
-        current: Uint128,
-        requested: Uint128,
-    },
+    InsufficientCw20Balance { current: Int256, requested: Int256 },
+
+    #[error("Invalid zero burn amount")]
+    InvalidZeroBurnamount {},
 }
