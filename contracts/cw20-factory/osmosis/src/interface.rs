@@ -1,7 +1,6 @@
 use cosmwasm_std::{Addr, Coin, CosmosMsg, DepsMut, Empty, Env, MessageInfo};
 use cw20_factory_pkg::cw20_factory::{
     interface::{InterfaceInstantiateResponse, TokenFactoryInterface},
-    msgs::InstantiateMsg,
     ContractResult,
 };
 use osmosis_std::types::{
@@ -17,9 +16,9 @@ impl TokenFactoryInterface for OsmosisTokenFactoryInterface {
         _deps: DepsMut<Empty>,
         env: &Env,
         _info: MessageInfo,
-        msg: InstantiateMsg,
+        symbol: String,
     ) -> ContractResult<InterfaceInstantiateResponse<Empty>> {
-        let subdenom = msg.symbol.to_lowercase();
+        let subdenom = symbol.to_lowercase();
         let msg = MsgCreateDenom {
             sender: env.contract.address.to_string(),
             subdenom: subdenom.clone(),

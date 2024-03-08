@@ -1,5 +1,7 @@
+use cosmwasm_std::Uint128;
 use cw20::MinterResponse;
-use cw20_factory_pkg::cw20_factory::msgs::InstantiateMsg;
+use cw20_base::msg::InstantiateMsg as Cw20BaseInstantiateMsg;
+use cw20_factory_pkg::cw20_factory::msgs::InstantiateMsg as FactoryInstantiateMsg;
 use rhaki_cw_plus::{
     asset::{AssetInfoPrecisioned, AssetPrecisioned},
     cw_asset::AssetInfo,
@@ -11,26 +13,27 @@ use rhaki_cw_plus::{
     traits::Wrapper,
 };
 
-use crate::helper::{create_token, qy_factory_denom, startup_osmosis, transmute};
+use crate::helper::{
+    burn, create_cw20_base, create_cw20_factory, create_native, migrate_to_factory, mint,
+    qy_factory_denom, qy_supply, startup_osmosis, transmute,
+};
 
 #[test]
 #[rustfmt::skip]
 fn t1() {
     let (mut app, db, def) = startup_osmosis();
 
-    let minter_foo = app.generate_addr("minter_foo");
-
-    let msg_init = InstantiateMsg {
+    let msg_init = FactoryInstantiateMsg {
         name: "Token Foo".to_string(),
         symbol: "FOO".to_string(),
         decimals: 6,
         initial_balances: vec![],
-        mint: MinterResponse{ minter: minter_foo.to_string(), cap: None }.wrap_some(),
+        mint: MinterResponse{ minter: def.owner.to_string(), cap: None }.wrap_some(),
         marketing: None,
         indexer: def.indexer_addr.to_string().wrap_some(),
     };
 
-    let foo_addr = create_token(&mut app, &def, msg_init, vec![]).unwrap();
+    let foo_addr = create_cw20_factory(&mut app, &def, msg_init, vec![]).unwrap();
 
     let user_1 = app.generate_addr("user_1");
 
@@ -68,21 +71,98 @@ fn t1() {
 
     db.borrow_mut().token_factory.fee_creation = CTokenFactoryFee { fee: vec![fee_token_creation.clone().try_into().unwrap()], fee_collector: tf_fee_collector }.wrap_some();
 
-    let msg_init = InstantiateMsg {
+    let msg_init = FactoryInstantiateMsg {
         name: "Token Bar".to_string(),
         symbol: "BAR".to_string(),
         decimals: 18,
         initial_balances: vec![],
-        mint: MinterResponse{ minter: minter_foo.to_string(), cap: None }.wrap_some(),
+        mint: MinterResponse{ minter: def.owner.to_string(), cap: None }.wrap_some(),
         marketing: None,
         indexer: def.indexer_addr.to_string().wrap_some(),
     };
 
-   create_token(&mut app, &def, msg_init.clone(), vec![]).unwrap_err_contains("Error on gather fee for denom creation");
+   create_cw20_factory(&mut app, &def, msg_init.clone(), vec![]).unwrap_err_contains("Error on gather fee for denom creation");
 
    app.mint(&def.owner, fee_token_creation.clone());
-   db.borrow_mut().token_factory.supplies.remove("factory/osmo1suhgf5svhu4usrurvxzlgn54ksxmn8gljarjtxqnapv8kjnp4nrsll0sqv/bar");
+   db.borrow_mut().token_factory.supplies.remove("factory/osmo1nc5tatafv6eyq7llkr2gv50ff9e22mnf70qgjlv737ktmt4eswrqvlx82r/bar");
 
-   create_token(&mut app, &def, msg_init, vec![fee_token_creation.try_into().unwrap()]).unwrap();
+   create_cw20_factory(&mut app, &def, msg_init, vec![fee_token_creation.try_into().unwrap()]).unwrap();
+
+}
+
+#[test]
+#[rustfmt::skip]
+fn t2_migration() {
+    let (mut app, db, def) = startup_osmosis();
+
+    let msg_init = Cw20BaseInstantiateMsg {
+        name: "Token Foo".to_string(),
+        symbol: "FOO".to_string(),
+        decimals: 6,
+        initial_balances: vec![],
+        mint: MinterResponse {
+            minter: def.owner.to_string(),
+            cap: None,
+        }
+        .wrap_some(),
+        marketing: None,
+    };
+
+    let foo_addr = create_cw20_base(&mut app, &def, msg_init, vec![]).unwrap();
+
+    let user_1 = app.generate_addr("user_1");
+
+    let foo_cw20 = AssetInfoPrecisioned::cw20(&foo_addr, 6);
+
+    let foo_native = AssetInfoPrecisioned::native(format!("factory/{}/{}", foo_addr, "foo"), 6);
+
+    app.mint(&user_1, foo_cw20.to_asset(100_u128.into_decimal()));
+
+    migrate_to_factory(&mut app, &def, &foo_addr).unwrap();
+
+    app.mint(&user_1, foo_cw20.to_asset(100_u128.into_decimal()));
+
+    let supply = qy_supply(&app, &foo_addr);
+    assert_eq!(supply.cw20_supply, foo_cw20.to_asset(200_u128.into_decimal()).amount_raw());
+    assert_eq!(supply.native_supply, Uint128::zero());
+    assert_eq!(supply.total_supply, supply.cw20_supply);
+
+    mint(&mut app, &def, &user_1, &foo_addr, foo_cw20.to_asset(100_u128.into_decimal())).unwrap();
+
+    let supply = qy_supply(&app, &foo_addr);
+    assert_eq!(supply.cw20_supply, foo_cw20.to_asset(300_u128.into_decimal()).amount_raw());
+    assert_eq!(supply.native_supply, Uint128::zero());
+    assert_eq!(supply.total_supply, supply.cw20_supply);
+
+    mint(&mut app, &def, &user_1, &foo_addr, foo_native.to_asset(100_u128.into_decimal())).unwrap_err_contains("Item factory_denom on contract cw20_factory can't be loaded");
+
+    let fee_token_creation = AssetPrecisioned::new_super(AssetInfo::native("uosmo"), 6, 100_u128.into_decimal());
+    let tf_fee_collector = app.generate_addr("tf_fee_collector");
+
+    db.borrow_mut().token_factory.fee_creation = CTokenFactoryFee { fee: vec![fee_token_creation.clone().try_into().unwrap()], fee_collector: tf_fee_collector }.wrap_some();
+
+    create_native(&mut app, &user_1, &foo_addr, vec![]).unwrap_err_contains("Error on gather fee for denom creation");
+
+    app.mint(&user_1, fee_token_creation.clone());
+
+    db.borrow_mut().token_factory.supplies.remove("factory/osmo14hj2tavq8fpesdwxxcu44rty3hh90vhujrvcmstl4zr3txmfvw9sq2r9g9/foo");
+
+    create_native(&mut app, &user_1, &foo_addr, vec![fee_token_creation.try_into().unwrap()]).unwrap();
+
+    mint(&mut app, &def, &user_1, &foo_addr, foo_native.to_asset(100_u128.into_decimal())).unwrap();
+
+    let supply = qy_supply(&app, &foo_addr);
+    assert_eq!(supply.cw20_supply, foo_cw20.to_asset(300_u128.into_decimal()).amount_raw());
+    assert_eq!(supply.native_supply, foo_native.to_asset(100_u128.into_decimal()).amount_raw());
+    assert_eq!(supply.total_supply, supply.cw20_supply + supply.native_supply);
+
+    burn(&mut app, &user_1, &foo_addr, foo_cw20.to_asset(200_u128.into_decimal())).unwrap();
+
+    burn(&mut app, &user_1, &foo_addr, foo_native.to_asset(50_u128.into_decimal())).unwrap();
+
+    let supply = qy_supply(&app, &foo_addr);
+    assert_eq!(supply.cw20_supply, foo_cw20.to_asset(100_u128.into_decimal()).amount_raw());
+    assert_eq!(supply.native_supply, foo_native.to_asset(50_u128.into_decimal()).amount_raw());
+    assert_eq!(supply.total_supply, supply.cw20_supply + supply.native_supply);
 
 }

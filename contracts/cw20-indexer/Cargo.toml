@@ -1,28 +1,31 @@
 [package]
-name                 = "cw20-factory-indexer"
-version              = { workspace = true }
-authors              = { workspace = true }
-edition              = { workspace = true }
-exclude              = ["contract.wasm", "hash.txt"]
+name             = "cw20-factory-indexer"
+description      = "Indexer for cw20-factory"
+version          = { workspace = true }
+authors          = { workspace = true }
+edition          = { workspace = true }
+license          = { workspace = true }
+repository       = { workspace = true }
+exclude          = ["contract.wasm", "hash.txt"]
 
 [lib]
-crate-type           = ["cdylib", "rlib"]
+crate-type       = ["cdylib", "rlib"]
 
 [profile.release]
-opt-level            = 3
-debug                = false
-rpath                = false
-lto                  = true
-debug-assertions     = false
-codegen-units        = 1
-panic                = 'abort'
-incremental          = false
-overflow-checks      = true
+opt-level        = 3
+debug            = false
+rpath            = false
+lto              = true
+debug-assertions = false
+codegen-units    = 1
+panic            = 'abort'
+incremental      = false
+overflow-checks  = true
 
 [dependencies]
-cosmwasm-std         = { workspace = true }
-cw20                 = { workspace = true }
-cw20-factory-pkg     = { workspace = true }
-cw-storage-plus      = { workspace = true }
-rhaki-cw-plus        = { workspace = true }
+cosmwasm-std     = { workspace = true }
+cw20             = { workspace = true }
+cw20-factory-pkg = { workspace = true }
+cw-storage-plus  = { workspace = true }
+rhaki-cw-plus    = { workspace = true }
 

@@ -13,20 +13,21 @@ use cw20_base::{
 
 use cw20_factory_pkg::{
     cw20_factory::{
-        definitions::TransmuteInto,
+        definitions::TransmuteIntoMsg,
         interface::TokenFactoryInterface,
-        msgs::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
+        msgs::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, SupplyDetailsResponse},
         traits::IntoCustom,
         ContractResponse, ContractResult, Cw20FactoryError,
     },
     cw20_indexer::msgs::RegisterDenomMsg,
 };
 use rhaki_cw_plus::{
+    storage::interfaces::ItemInterface,
     traits::{FromBinary, IntoAddr, IntoBinary, IntoBinaryResult, IntoStdResult, Wrapper},
     wasm::WasmMsgBuilder,
 };
 
-use crate::state::FACTORY_DENOM;
+use crate::state::FactoryDenom;
 
 pub struct Cw20FactoryBase<CQ: CustomQuery, I: TokenFactoryInterface<CQ, CM>, CM = Empty> {
     pub custom_query: PhantomData<CQ>,
@@ -54,7 +55,7 @@ where
             msg.clone().into(),
         )?;
 
-        let interface_response = I::instantiate(deps.branch(), &env, info, msg.clone())?;
+        let interface_response = I::instantiate(deps.branch(), &env, info, msg.symbol)?;
 
         let indexer_msg = if let Some(indexer) = msg.indexer {
             let msg: CosmosMsg = WasmMsg::build_execute(
@@ -70,9 +71,10 @@ where
             vec![]
         };
 
-        FACTORY_DENOM.save(deps.storage, &interface_response.factory_denom)?;
+        let factory_denom = FactoryDenom::new(interface_response.factory_denom.clone());
+        factory_denom.save(deps.storage)?;
 
-        Response::<CM>::new()
+        Response::new()
             .add_attributes(base_response.attributes)
             .add_attributes(interface_response.attributes)
             .add_attribute("factory_denom", interface_response.factory_denom)
@@ -99,6 +101,7 @@ where
             ExecuteMsg::RegisterToIndexer { indexer_addr } => {
                 Self::run_register_into_indexer(deps, indexer_addr)
             }
+            ExecuteMsg::CreateNative {} => Self::run_create_native(deps, env, info),
             _ => {
                 let base: Cw20ExecuteMsg = msg.into_binary()?.des_into()?;
 
@@ -111,7 +114,10 @@ where
 
     pub fn query(deps: Deps<CQ>, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         match msg {
-            QueryMsg::FactoryDenom {} => FACTORY_DENOM.load(deps.storage).into_binary(),
+            QueryMsg::FactoryDenom {} => FactoryDenom::load(deps.storage).into_binary(),
+            QueryMsg::SupplyDetails {} => Self::qy_supply_details(deps.into_empty())
+                .into_std_result()
+                .into_binary(),
             QueryMsg::TokenInfo {} => Self::qy_token_info(deps.into_empty())
                 .into_std_result()
                 .into_binary(),
@@ -141,12 +147,12 @@ where
         mut deps: DepsMut<CQ>,
         env: Env,
         info: MessageInfo,
-        into: TransmuteInto,
+        into: TransmuteIntoMsg,
     ) -> ContractResponse<CM> {
         let (msgs, attrs) = match into {
-            TransmuteInto::Native { amount } => {
+            TransmuteIntoMsg::Native { amount } => {
                 Self::burn_cw20(deps.branch().into_empty(), &info.sender, amount)?;
-                let mint_coin = Coin::new(amount.u128(), FACTORY_DENOM.load(deps.storage)?);
+                let mint_coin = Coin::new(amount.u128(), FactoryDenom::load(deps.storage)?.inner());
                 (
                     I::mint(deps.branch(), &env, &info, &info.sender, &mint_coin)?,
                     vec![
@@ -155,7 +161,7 @@ where
                     ],
                 )
             }
-            TransmuteInto::Cw20 {} => {
+            TransmuteIntoMsg::Cw20 {} => {
                 let brun_coin = rhaki_cw_plus::asset::only_one_coin(&info.funds, None)?;
                 Self::assert_denom(deps.storage, &brun_coin)?;
                 Self::mint_cw20(deps.branch().into_empty(), &info.sender, brun_coin.amount)?;
@@ -188,7 +194,7 @@ where
 
         let (msgs, action) = match as_native.unwrap_or(false) {
             true => {
-                let mint_coin = Coin::new(amount.u128(), FACTORY_DENOM.load(deps.storage)?);
+                let mint_coin = Coin::new(amount.u128(), FactoryDenom::load(deps.storage)?.inner());
                 Self::validate_max_supply(deps.as_ref().into_empty(), amount.wrap_some())?;
                 (
                     I::mint(deps.branch(), &env, &info, &recipient, &mint_coin)?,
@@ -223,7 +229,7 @@ where
                 vec![attr("action", "burn_cw20"), attr("amount", amount)],
             )
         } else {
-            let denom = FACTORY_DENOM.load(deps.storage)?;
+            let denom = FactoryDenom::load(deps.storage)?.inner();
             let burn_coin = rhaki_cw_plus::asset::only_one_coin(&info.funds, Some(denom))?;
             (
                 I::burn(deps, &env, &info, &burn_coin)?,
@@ -241,18 +247,41 @@ where
     }
 
     pub fn run_register_into_indexer(deps: DepsMut<CQ>, indexer: String) -> ContractResponse<CM> {
-        let denom = FACTORY_DENOM.load(deps.storage)?;
+        let denom = FactoryDenom::load(deps.storage)?.inner();
 
         Response::new()
             .add_attribute("action", "register_into_indexer")
             .add_attribute("indexer", &indexer)
             .add_message(WasmMsg::build_execute(
-                indexer.into_addr(deps.api)?,
+                indexer.clone().into_addr(deps.api)?,
                 cw20_factory_pkg::cw20_indexer::msgs::ExecuteMsg::RegisterDenom(RegisterDenomMsg {
                     denom,
                 }),
                 vec![],
             )?)
+            .wrap_ok()
+    }
+
+    pub fn run_create_native(
+        mut deps: DepsMut<CQ>,
+        env: Env,
+        info: MessageInfo,
+    ) -> ContractResponse<CM> {
+        let token_info = TOKEN_INFO.load(deps.storage)?;
+        if FactoryDenom::load(deps.storage).is_ok() {
+            return Err(Cw20FactoryError::NativeTokenAlredyCreated {});
+        }
+        let interface_response =
+            I::instantiate(deps.branch(), &env, info, token_info.symbol.clone())?;
+
+        let factory_denom = FactoryDenom::new(interface_response.factory_denom.clone());
+        factory_denom.save(deps.storage)?;
+
+        Response::new()
+            .add_attribute("action", "create_native")
+            .add_attributes(interface_response.attributes)
+            .add_attribute("factory_denom", interface_response.factory_denom)
+            .add_messages(interface_response.messages)
             .wrap_ok()
     }
 }
@@ -276,7 +305,7 @@ where
     }
 
     fn assert_denom(storage: &dyn Storage, coin: &Coin) -> ContractResult<()> {
-        let denom = FACTORY_DENOM.load(storage)?;
+        let denom = FactoryDenom::load(storage)?.inner();
 
         if denom != coin.denom {
             Err(Cw20FactoryError::InvalidDenom {
@@ -322,18 +351,13 @@ where
         let token_info = TOKEN_INFO.load(deps.storage)?;
         if let Some(minter) = token_info.mint {
             if let Some(cap) = minter.cap {
-                let supply = Self::get_total_supply(deps)?;
+                let supply = Self::qy_supply_details(deps)?.total_supply;
                 if supply + extra_amount.unwrap_or_default() > cap {
                     return Err(Cw20FactoryError::Base(Cw20BaseError::CannotExceedCap {}));
                 }
             }
         }
         Ok(())
-    }
-
-    fn get_total_supply(deps: Deps) -> ContractResult<Uint128> {
-        let denom = FACTORY_DENOM.load(deps.storage)?;
-        Ok(TOKEN_INFO.load(deps.storage)?.total_supply + deps.querier.query_supply(denom)?.amount)
     }
 
     fn assert_minter(deps: Deps, sender: &Addr) -> ContractResult<()> {
@@ -354,12 +378,28 @@ where
 
     fn qy_token_info(deps: Deps) -> ContractResult<TokenInfoResponse> {
         let info = TOKEN_INFO.load(deps.storage)?;
-        let supply = Self::get_total_supply(deps)?;
+        let supply = Self::qy_supply_details(deps)?.total_supply;
         Ok(TokenInfoResponse {
             name: info.name,
             symbol: info.symbol,
             decimals: info.decimals,
             total_supply: supply,
         })
+    }
+
+    fn qy_supply_details(deps: Deps) -> ContractResult<SupplyDetailsResponse> {
+        let cw20_supply = TOKEN_INFO.load(deps.storage)?.total_supply;
+        let native_supply = if let Ok(denom) = FactoryDenom::load(deps.storage) {
+            deps.querier.query_supply(denom.inner())?.amount
+        } else {
+            Uint128::zero()
+        };
+
+        SupplyDetailsResponse {
+            cw20_supply,
+            native_supply,
+            total_supply: cw20_supply + native_supply,
+        }
+        .wrap_ok()
     }
 }

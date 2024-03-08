@@ -10,7 +10,7 @@ use rhaki_cw_plus::{
 
 use crate::{
     function::validate_denom,
-    query::{qy_cw20_denom, qy_cw20_token_info},
+    query::{qy_cw20_denom, qy_cw20_token_info, qy_tokens_info},
     state::CW20_MAP,
 };
 
@@ -30,12 +30,16 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
         ExecuteMsg::RegisterDenom(msg) => {
             validate_denom(&msg.denom, &info.sender)?;
             qy_cw20_token_info(deps.as_ref(), &info.sender)?;
-            qy_cw20_denom(deps.as_ref(), &info.sender)?;
-            if CW20_MAP.has(deps.storage, &msg.denom) {
+            qy_cw20_denom(deps.as_ref(), &info.sender).map_err(|_| {
+                Cw20IndexerError::DenomNotFound {
+                    cw20: info.sender.clone(),
+                }
+            })?;
+            if CW20_MAP.has(deps.storage, msg.denom.clone()) {
                 return Err(Cw20IndexerError::DenomAlredySaved { denom: msg.denom });
             };
 
-            CW20_MAP.save(deps.storage, &msg.denom, &info.sender)?;
+            CW20_MAP.save(deps.storage, msg.denom, &info.sender)?;
             Response::new().wrap_ok()
         }
     }
@@ -45,9 +49,14 @@ pub fn execute(deps: DepsMut, _env: Env, info: MessageInfo, msg: ExecuteMsg) -> 
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::TokenInfo { denom } => {
-            let cw20_addr = CW20_MAP.better_load(deps.storage, &denom)?;
+            let cw20_addr = CW20_MAP.better_load(deps.storage, denom)?;
             qy_cw20_token_info(deps, &cw20_addr).into_binary()
         }
+        QueryMsg::TokensInfo {
+            start_after,
+            limit,
+            order,
+        } => qy_tokens_info(deps, start_after, limit, order).into_binary(),
     }
 }
 

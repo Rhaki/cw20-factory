@@ -4,8 +4,6 @@ use cosmwasm_std::{
 
 use crate::cw20_factory::ContractResult;
 
-use super::msgs::InstantiateMsg;
-
 pub struct InterfaceInstantiateResponse<CM> {
     pub attributes: Vec<Attribute>,
     pub messages: Vec<CosmosMsg<CM>>,
@@ -17,7 +15,7 @@ pub trait TokenFactoryInterface<CQ: CustomQuery = Empty, CM = Empty> {
         deps: DepsMut<CQ>,
         env: &Env,
         info: MessageInfo,
-        msg: InstantiateMsg,
+        symbol: String,
     ) -> ContractResult<InterfaceInstantiateResponse<CM>>;
 
     fn burn(

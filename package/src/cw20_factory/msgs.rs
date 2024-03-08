@@ -3,7 +3,7 @@ use cosmwasm_std::{Binary, Uint128};
 use cw20::{Cw20Coin, Expiration, Logo, MinterResponse};
 use cw20_base::msg::InstantiateMarketingInfo;
 
-use super::definitions::TransmuteInto;
+use super::definitions::TransmuteIntoMsg;
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -32,14 +32,23 @@ impl From<InstantiateMsg> for cw20_base::msg::InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     /// Transmute `cw20` into `native` token or vice versa
-    TransmuteInto(TransmuteInto),
+    TransmuteInto(TransmuteIntoMsg),
     /// Register this contract into an indexer
-    RegisterToIndexer { indexer_addr: String },
+    RegisterToIndexer {
+        indexer_addr: String,
+    },
+    /// Create native token after a migration from cw20-base
+    CreateNative {},
     // --- Base CW20 variants ---
     /// Transfer is a base message to move tokens to another account without triggering actions
-    Transfer { recipient: String, amount: Uint128 },
+    Transfer {
+        recipient: String,
+        amount: Uint128,
+    },
     /// Burn is a base message to destroy tokens forever
-    Burn { amount: Option<Uint128> },
+    Burn {
+        amount: Option<Uint128>,
+    },
     /// Send is a base message to transfer tokens to a contract and trigger an action
     /// on the receiving contract.
     Send {
@@ -79,7 +88,10 @@ pub enum ExecuteMsg {
         msg: Binary,
     },
     /// Only with "approval" extension. Destroys tokens forever
-    BurnFrom { owner: String, amount: Uint128 },
+    BurnFrom {
+        owner: String,
+        amount: Uint128,
+    },
     /// Only with the "mintable" extension. If authorized, creates amount new tokens
     /// and adds to the recipient balance.
     Mint {
@@ -90,7 +102,9 @@ pub enum ExecuteMsg {
     /// Only with the "mintable" extension. The current minter may set
     /// a new minter. Setting the minter to None will remove the
     /// token's minter forever.
-    UpdateMinter { new_minter: Option<String> },
+    UpdateMinter {
+        new_minter: Option<String>,
+    },
     /// Only with the "marketing" extension. If authorized, updates marketing metadata.
     /// Setting None/null for any of these will leave it unchanged.
     /// Setting Some("") will clear this field on the contract storage
@@ -109,8 +123,12 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
+    /// Returns the factory denom for this token
     #[returns(String)]
     FactoryDenom {},
+    /// Returns the total supply of the contract, sum of all token balances.
+    #[returns(SupplyDetailsResponse)]
+    SupplyDetails {},
     /// Returns the current balance of the given address, 0 if unset.
     #[returns(cw20::BalanceResponse)]
     Balance { address: String },
@@ -162,3 +180,10 @@ pub enum QueryMsg {
 
 #[cw_serde]
 pub struct MigrateMsg {}
+
+#[cw_serde]
+pub struct SupplyDetailsResponse {
+    pub total_supply: Uint128,
+    pub cw20_supply: Uint128,
+    pub native_supply: Uint128,
+}

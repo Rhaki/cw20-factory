@@ -1,13 +1,17 @@
 [package]
-name                 = "cw20-factory-base"
-version              = { workspace = true }
-authors              = { workspace = true }
-edition              = { workspace = true }
+name             = "cw20-factory-base"
+description      = "Core contract for cw20 factory"
+version          = { workspace = true }
+authors          = { workspace = true }
+edition          = { workspace = true }
+license          = { workspace = true }
+repository       = { workspace = true }
 
 [dependencies]
-cosmwasm-std         = { workspace = true }
-cw20                 = { workspace = true }
-cw20-base            = { workspace = true }
-cw20-factory-pkg     = { workspace = true }
-cw-storage-plus      = { workspace = true }
-rhaki-cw-plus        = { workspace = true }
+cosmwasm-std     = { workspace = true }
+cosmwasm-schema  = { workspace = true }
+cw20             = { workspace = true }
+cw20-base        = { workspace = true }
+cw20-factory-pkg = { workspace = true }
+cw-storage-plus  = { workspace = true }
+rhaki-cw-plus    = { workspace = true }

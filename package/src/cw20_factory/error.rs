@@ -21,4 +21,7 @@ pub enum Cw20FactoryError {
 
     #[error("Invalid zero burn amount")]
     InvalidZeroBurnamount {},
+
+    #[error("Native token alredy created")]
+    NativeTokenAlredyCreated {},
 }

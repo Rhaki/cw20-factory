@@ -1,4 +1,4 @@
-use cosmwasm_std::{Response, StdError};
+use cosmwasm_std::{Addr, Response, StdError};
 use thiserror::Error;
 
 pub type ContractResponse = Result<Response, Cw20IndexerError>;
@@ -17,4 +17,7 @@ pub enum Cw20IndexerError {
 
     #[error("Denom already saved: {denom}")]
     DenomAlredySaved { denom: String },
+
+    #[error("Denom not found: denom not found for cw20 {cw20}")]
+    DenomNotFound { cw20: Addr },
 }
