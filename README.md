@@ -1,10 +1,11 @@
 # CW20 FACTORY
 
-The `cw20-factory` derived from the standard `CW20` implementation, designed to streamline the management of tokens both in the `CW20` and native formats through the use of a `Token Factory`. During the initial phase of contract initialization, the `native` version of the `token` is also produced via the `Token Factory`. This implementation retains the original `entry points` of the `cw20-base`, yet it is enhanced with the `ExecuteMsg::TransmuteInto` and others functionality. This feature allows users to convert `native` tokens into `CW20` formats and vice versa.
+The `cw20-factory` derived from the standard `CW20` implementation, designed to streamline the management of tokens both in the `CW20` and `native` version through the use of a `Token Factory`. During contract initialization, the `native` version of the `token` is also produced via the `Token Factory`. This implementation retains the original `entry points` of the `cw20-base`, yet it is enhanced with the `ExecuteMsg::TransmuteInto` (feature that allows users to convert `native` tokens into `CW20` formats and vice versa) and others functionality.
 
-In parallel, an auxiliary contract named `Indexer` is introduced, tasked with mapping between the `denom` associated with the `Token Factory` and the `CW20` address. This association process occurs automatically during the `cw20-factory` initialization.
+In parallel, an auxiliary contract named `Indexer` is introduced, tasked with mapping between the `denom` associated with the `Token Factory` and the `CW20` address. This association process can occurs automatically during the `cw20-factory` initialization if optional indexer field is provided (backwards compatible).
+It is possible to register a `cw20-factory` with multiple `Indexer`, allowing the management of specific token subsets based on needs (For example, a protocol can create its own indexer for the tokens it manages). Registration can be requested from the `cw20-factory` in a permissionless manner.
 
-To ensure proper management of the various types of `Token Factories` across different blockchains, the contract requires, at the compilation level, the use of a structure that implements the `TokenFactoryInterface` trait. This trait serves as a communicative bridge with the specific `TokenFactory` module of each blockchain, maintaining the base code's independence from interchain variations.
+To ensure proper management of the various types of `Token Factories` across different blockchains, the contract requires, at the compilation level, the use of a structure that implements the `TokenFactoryInterface` `trait`. This `trait` serves as a communicative bridge with the specific `TokenFactory` module of each blockchain, maintaining the base code's independence from interchain variations.
 
 ## ExecuteMsg implementation
 
@@ -22,16 +23,16 @@ pub enum ExecuteMsg {
     /// Create native token after a migration from cw20-base
     CreateNative {},
     Burn {
-        /// Amount is now optional
-        /// If want to burn native token, amount field is not used (info.funds will be checked).
-        /// If want to burn cw20, specify amount (backwards compatible)
+        /// Amount is now optional:
+        /// - Burn native: amount field is not used (info.funds will be checked).
+        /// - Burn cw20: need to specify amount (backwards compatible)
         amount: Option<Uint128>,
     },
     Mint {
         recipient: String,
         amount: Uint128,
         /// New field.
-        /// If not provided, it will mint as cw20 (backwards compatible)
+        /// If not provided, mint will happens as cw20 (backwards compatible)
         as_native: Option<bool>,
     },
     ...
