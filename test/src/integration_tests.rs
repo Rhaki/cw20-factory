@@ -1,7 +1,7 @@
 use cosmwasm_std::Uint128;
 use cw20::MinterResponse;
 use cw20_base::msg::InstantiateMsg as Cw20BaseInstantiateMsg;
-use cw20_factory_pkg::cw20_factory::msgs::InstantiateMsg as FactoryInstantiateMsg;
+use cw20_factory_pkg::cw20_factory::msgs::{InitNativeDetails, InstantiateMsg as FactoryInstantiateMsg};
 use rhaki_cw_plus::{
     asset::{AssetInfoPrecisioned, AssetPrecisioned},
     cw_asset::AssetInfo,
@@ -31,7 +31,7 @@ fn t1() {
         initial_balances: vec![],
         mint: MinterResponse{ minter: def.owner.to_string(), cap: None }.wrap_some(),
         marketing: None,
-        indexer: def.indexer_addr.to_string().wrap_some(),
+        init_native: InitNativeDetails::WithIndexer(def.indexer_addr.to_string()).wrap_some(),
     };
 
     let foo_addr = create_cw20_factory(&mut app, &def, msg_init, vec![]).unwrap();
@@ -81,7 +81,7 @@ fn t1() {
         initial_balances: vec![],
         mint: MinterResponse{ minter: def.owner.to_string(), cap: None }.wrap_some(),
         marketing: None,
-        indexer: def.indexer_addr.to_string().wrap_some(),
+        init_native: InitNativeDetails::WithIndexer(def.indexer_addr.to_string()).wrap_some(),
     };
 
    create_cw20_factory(&mut app, &def, msg_init.clone(), vec![]).unwrap_err_contains("Error on gather fee for denom creation");
@@ -167,5 +167,51 @@ fn t2_migration() {
     assert_eq!(supply.cw20_supply, foo_cw20.to_asset(100_u128.into_decimal()).amount_raw());
     assert_eq!(supply.native_supply, foo_native.to_asset(50_u128.into_decimal()).amount_raw());
     assert_eq!(supply.total_supply, supply.cw20_supply + supply.native_supply);
+
+}
+
+#[test]
+#[rustfmt::skip]
+fn t3_no_init_native() {
+    let (mut app, mut db, def) = startup_osmosis();
+
+    let fee_token_creation = AssetPrecisioned::new_super(AssetInfo::native("uosmo"), 6, 100_u128.into_decimal());
+    let tf_fee_collector = app.generate_addr("tf_fee_collector");
+
+    db.as_db(app.storage_mut(), |db,_| {
+        db.token_factory.fee_creation = CTokenFactoryFee { fee: vec![fee_token_creation.clone().try_into().unwrap()], fee_collector: tf_fee_collector }.wrap_some();
+    }).unwrap();
+
+    let msg_init = FactoryInstantiateMsg {
+        name: "Token Foo".to_string(),
+        symbol: "FOO".to_string(),
+        decimals: 6,
+        initial_balances: vec![],
+        mint: MinterResponse{ minter: def.owner.to_string(), cap: None }.wrap_some(),
+        marketing: None,
+        init_native: None,
+    };
+
+    let foo_addr = create_cw20_factory(&mut app, &def, msg_init, vec![]).unwrap();
+
+    let user_1 = app.generate_addr("user_1");
+
+    let foo_cw20 = AssetInfoPrecisioned::cw20(&foo_addr, 6);
+
+    create_native(&mut app, &user_1, &foo_addr, vec![]).unwrap_err_contains("Error on gather fee for denom creation");
+
+    app.mint(&user_1, fee_token_creation.clone());
+
+    create_native(&mut app, &user_1, &foo_addr, vec![fee_token_creation.try_into().unwrap()]).unwrap();
+
+    let native_denom = qy_factory_denom(&app, &foo_addr);
+
+    let foo_native = AssetInfoPrecisioned::native(native_denom, 6);
+
+    app.mint(&user_1, foo_cw20.to_asset(100_u128.into_decimal()));
+
+    transmute(&mut app, &user_1, &foo_addr, foo_cw20.to_asset(100_u128.into_decimal())).unwrap();
+
+    assert_eq!(app.qy_balance(&user_1, &foo_native).unwrap(), foo_native.to_asset(100_u128.into_decimal()));
 
 }

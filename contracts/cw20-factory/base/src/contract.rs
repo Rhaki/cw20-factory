@@ -15,7 +15,10 @@ use cw20_factory_pkg::{
     cw20_factory::{
         definitions::TransmuteIntoMsg,
         interface::TokenFactoryInterface,
-        msgs::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg, SupplyDetailsResponse},
+        msgs::{
+            ExecuteMsg, InitNativeDetails, InstantiateMsg, MigrateMsg, QueryMsg,
+            SupplyDetailsResponse,
+        },
         traits::IntoCustom,
         ContractResponse, ContractResult, Cw20FactoryError,
     },
@@ -55,33 +58,38 @@ where
             msg.clone().into(),
         )?;
 
-        let interface_response = I::instantiate(deps.branch(), &env, info, msg.symbol)?;
-
-        let indexer_msg = if let Some(indexer) = msg.indexer {
-            let msg: CosmosMsg = WasmMsg::build_execute(
-                indexer.into_addr(deps.api)?,
-                cw20_factory_pkg::cw20_indexer::msgs::ExecuteMsg::RegisterDenom(RegisterDenomMsg {
-                    denom: interface_response.factory_denom.clone(),
-                }),
-                vec![],
-            )?
-            .into();
-            vec![msg.to_custom()]
-        } else {
-            vec![]
-        };
-
-        let factory_denom = FactoryDenom::new(interface_response.factory_denom.clone());
-        factory_denom.save(deps.storage)?;
-
-        Response::new()
+        let mut response = Response::new()
             .add_attributes(base_response.attributes)
-            .add_attributes(interface_response.attributes)
-            .add_attribute("factory_denom", interface_response.factory_denom)
-            .add_submessages(base_response.messages.to_custom())
-            .add_messages(interface_response.messages)
-            .add_messages(indexer_msg)
-            .wrap_ok()
+            .add_submessages(base_response.messages.to_custom());
+
+        if let Some(init_native) = msg.init_native {
+            let interface_response = I::instantiate(deps.branch(), &env, info, msg.symbol)?;
+
+            response = response.add_messages(interface_response.messages);
+
+            if let InitNativeDetails::WithIndexer(indexer) = init_native {
+                let indexer_msg: CosmosMsg<CM> = WasmMsg::build_execute(
+                    indexer.into_addr(deps.api)?,
+                    cw20_factory_pkg::cw20_indexer::msgs::ExecuteMsg::RegisterDenom(
+                        RegisterDenomMsg {
+                            denom: interface_response.factory_denom.clone(),
+                        },
+                    ),
+                    vec![],
+                )?
+                .into();
+                response = response.add_message(indexer_msg);
+            }
+
+            let factory_denom = FactoryDenom::new(interface_response.factory_denom.clone());
+            factory_denom.save(deps.storage)?;
+
+            response = response
+                .add_attributes(interface_response.attributes)
+                .add_attribute("factory_denom", interface_response.factory_denom);
+        }
+
+        response.wrap_ok()
     }
 
     pub fn execute(

@@ -13,7 +13,7 @@ pub struct InstantiateMsg {
     pub initial_balances: Vec<Cw20Coin>,
     pub mint: Option<MinterResponse>,
     pub marketing: Option<InstantiateMarketingInfo>,
-    pub indexer: Option<String>,
+    pub init_native: Option<InitNativeDetails>,
 }
 
 impl From<InstantiateMsg> for cw20_base::msg::InstantiateMsg {
@@ -34,21 +34,14 @@ pub enum ExecuteMsg {
     /// Transmute `cw20` into `native` token or vice versa
     TransmuteInto(TransmuteIntoMsg),
     /// Register this contract into an indexer
-    RegisterToIndexer {
-        indexer_addr: String,
-    },
+    RegisterToIndexer { indexer_addr: String },
     /// Create native token after a migration from cw20-base
     CreateNative {},
     // --- Base CW20 variants ---
     /// Transfer is a base message to move tokens to another account without triggering actions
-    Transfer {
-        recipient: String,
-        amount: Uint128,
-    },
+    Transfer { recipient: String, amount: Uint128 },
     /// Burn is a base message to destroy tokens forever
-    Burn {
-        amount: Option<Uint128>,
-    },
+    Burn { amount: Option<Uint128> },
     /// Send is a base message to transfer tokens to a contract and trigger an action
     /// on the receiving contract.
     Send {
@@ -88,10 +81,7 @@ pub enum ExecuteMsg {
         msg: Binary,
     },
     /// Only with "approval" extension. Destroys tokens forever
-    BurnFrom {
-        owner: String,
-        amount: Uint128,
-    },
+    BurnFrom { owner: String, amount: Uint128 },
     /// Only with the "mintable" extension. If authorized, creates amount new tokens
     /// and adds to the recipient balance.
     Mint {
@@ -102,9 +92,7 @@ pub enum ExecuteMsg {
     /// Only with the "mintable" extension. The current minter may set
     /// a new minter. Setting the minter to None will remove the
     /// token's minter forever.
-    UpdateMinter {
-        new_minter: Option<String>,
-    },
+    UpdateMinter { new_minter: Option<String> },
     /// Only with the "marketing" extension. If authorized, updates marketing metadata.
     /// Setting None/null for any of these will leave it unchanged.
     /// Setting Some("") will clear this field on the contract storage
@@ -186,4 +174,10 @@ pub struct SupplyDetailsResponse {
     pub total_supply: Uint128,
     pub cw20_supply: Uint128,
     pub native_supply: Uint128,
+}
+
+#[cw_serde]
+pub enum InitNativeDetails {
+    WithIndexer(String),
+    WithoutIndexer,
 }
